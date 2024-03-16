@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+
+# Config
+HOME=$(realpath "$HOME") # Yeah, I don't know why argon does this
+nix_version="2.20"
+nix_url="https://hydra.nixos.org/job/nix/maintenance-${nix_version}/buildStatic.x86_64-linux/latest/download-by-type/file/binary-dist"
+nix_location="$HOME/.local/bin"
+bash_profile="$HOME/.bashrc"
+bash_dir="$HOME/.bashrc.d"
+bashrc_fragment="$bash_dir/nix.bash"
+nix_exe="${nix_location}/nix"
+nix_conf_home="${XDG_CONFIG_HOME:-$HOME/.config}"/nix
+
+# Run
+
+cat << EOF
+This script will install nix locally, it was designed to be minimally invasive.
+It will, however, make a couple of changes to your environment.
+
+1) It will download the official nix executeable into $nix_location
+2) It will modify your bashrc $bash_profile so nix is discoverable
+3) It will add git to your default module set
+
+EOF
+
+read -p "Would you like to continue (y/n)? " -n 1 -r choice
+
+case "$choice" in
+	y|Y ) ;;
+	* ) echo "Aborting" && exit 1;;
+esac
+echo
+
+# Download nix
+download_nix() {
+	nix_exe=$(realpath "$nix_exe")
+
+	[ -f "$nix_exe" ] && return 0
+
+	mkdir -p "$nix_location"
+	echo "Downloading nix to $nix_exe"
+	curl -L "$nix_url" -o "$nix_exe"
+	chmod +x "$nix_exe"
+}
+
+download_nix
+
+# Modify bashrc
+echo "Modifying bashrc"
+
+mkdir -p "$bash_dir"
+cat << 'EOF' > "$bashrc_fragment"
+# This will add a directory to a path if its not already there
+pathadd() {
+    if [ -d "$1" ] && [[ ":$PATH:" != *":$1:"* ]]; then
+        PATH="${PATH:+"$PATH:"}$1"
+    fi
+}
+
+# Home should not be a symlink, I'm not really sure why it is one
+HOME=$(realpath "$HOME")
+#
+# Nix needs to know where this is
+export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+
+# Add .local/bin to the path
+pathadd "$HOME/.local/bin"
+EOF
+
+grep -q "$bashrc_fragment" "$bash_profile" || {
+	cat <<- EOF >> "$bash_profile"
+	
+	# Load nix
+	. "$bashrc_fragment"
+	EOF
+}
+
+# Modify module set
+echo "Loading git module"
+module load git
+echo "Saving current module set"
+module save
+
+# Configure nix
+mkdir -p "$nix_conf_home"
+nix_conf="$nix_conf_home"/nix.conf
+grep -q "experimental-features" "$nix_conf" || cat "experimental-features = nix-command flakes" >> "$nix_conf"
+grep -q "sandbox = false" "$nix_conf" || cat "sandbox = false" >> "$nix_conf"
+
+link_to_nix() {
+	ln -s "${nix_location}/nix" "${nix_location}/${1}"
+}
+
+link_to_nix "nix-build"
+link_to_nix "nix-channel"
+link_to_nix "nix-collect-garbage"
+link_to_nix "nix-copy-closure"
+link_to_nix "nix-env"
+link_to_nix "nix-hash"
+link_to_nix "nix-instantiate"
+link_to_nix "nix-prefetch-url"
+link_to_nix "nix-shell"
+link_to_nix "nix-store"
+
+# Check
+echo "Initial run of nix to make sure everthing works, this may take a second..."
+$nix_exe run nixpkgs#cowsay -- "All done! You probably have to re-login or run \`. ~/.bashrc\`"
