@@ -2,7 +2,7 @@
 
 # Config
 HOME=$(realpath "$HOME") # Yeah, I don't know why argon does this
-nix_version="2.20"
+nix_version="2.23"
 nix_url="https://hydra.nixos.org/job/nix/maintenance-${nix_version}/buildStatic.x86_64-linux/latest/download-by-type/file/binary-dist"
 nix_location="$HOME/.local/bin"
 bash_profile="$HOME/.bashrc"
@@ -34,9 +34,6 @@ echo
 # Download nix
 download_nix() {
 	nix_exe=$(realpath "$nix_exe")
-
-	[ -f "$nix_exe" ] && return 0
-
 	mkdir -p "$nix_location"
 	echo "Downloading nix to $nix_exe"
 	curl -L "$nix_url" -o "$nix_exe"
@@ -59,7 +56,7 @@ pathadd() {
 
 # Home should not be a symlink, I'm not really sure why it is one
 HOME=$(realpath "$HOME")
-#
+
 # Nix needs to know where this is
 export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
 
