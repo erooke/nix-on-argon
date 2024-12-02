@@ -20,6 +20,7 @@ It will, however, make a couple of changes to your environment.
 1) It will download the official nix executeable into $nix_location
 2) It will modify your bashrc $bash_profile so nix is discoverable
 3) It will add git to your default module set
+4) It will add a monthly cron job to cleanup leftover nix data
 
 EOF
 
@@ -98,6 +99,12 @@ link_to_nix "nix-instantiate"
 link_to_nix "nix-prefetch-url"
 link_to_nix "nix-shell"
 link_to_nix "nix-store"
+
+# Setup cronjob
+echo "Configuring cronjob"
+cron_cmd="HOME=$HOME $HOME/.local/bin/nix-collect-garbage"
+cron_job="@monthly $cron_cmd"
+( crontab -l | grep -v -F "$cron_cmd" || : ; echo "$cron_job") | crontab -
 
 # Check
 echo "Initial run of nix to make sure everthing works, this may take a second..."
